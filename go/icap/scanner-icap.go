@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 	//"strconv"
 	//"strings"
 )
@@ -34,7 +35,10 @@ func errorExit(err string) {
 }
 
 func getServiceOptions() string {
-	requestHeader := "OPTIONS icap://" + serverIP + "/" + icapService + " ICAP/" + version + "\r\n" + "Host: " + serverIP + "\r\n" + "User-Agent: " + useragent + "\r\n" + "Encapsulated: null-body=0\r\n" + "\r\n"
+	//requestHeader := "OPTIONS icap://" + serverIP + "/" + icapService + " ICAP/" + version + "\r\n" + "Host: " + serverIP + "\r\n" + "User-Agent: " + useragent + "\r\n" + "Encapsulated: null-body=0\r\n" + "\r\n"
+	requestHeader := "OPTIONS icap://" + serverIP + ":" + serverPort + "/ " +
+		"ICAP/" + version + "\r\n" + "Host: " + serverIP + ":" + serverPort + "\r\n" +
+		"Encapsulated: null-body=0\r\n\r\n"
 	return requestHeader
 }
 
@@ -42,17 +46,22 @@ func main() {
 	// if len(os.Args) != 4 {
 	// 	errorExit("usage: icap --scan file serverhost port")
 	// }
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", serverIP+":"+serverPort)
-	checkError(err)
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	conn, err := net.DialTimeout("tcp", serverIP+":"+serverPort, 1*time.Second)
 	checkError(err)
 	_, err = conn.Write([]byte(getServiceOptions()))
 	checkError(err)
-	serverResponseBuffer := make([]byte, 4096)
-	numBytesRead, err := conn.Read(serverResponseBuffer)
-	checkError(err)
+	bufferSize := 4096
+	serverResponseBuffer := make([]byte, bufferSize)
 	fmt.Println("Response to Request for Server Options:")
-	fmt.Printf("%s\n", serverResponseBuffer[0:numBytesRead])
+	var fullResponse []byte
+	numBytesRead := bufferSize
+	for numBytesRead == bufferSize {
+		numBytesRead, err = conn.Read(serverResponseBuffer)
+		checkError(err)
+		//fmt.Printf("%s\n", serverResponseBuffer[0:numBytesRead])
+		fullResponse = append(fullResponse, serverResponseBuffer[0:numBytesRead]...)
+	}
+	fmt.Printf("%s\n", fullResponse)
 	os.Exit(0)
 }
 
